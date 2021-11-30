@@ -19,7 +19,7 @@ class MainController {
         (async function () {
             try {
                 await sql.connect(config)
-                const query = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_CATALOG='test'";
+                const query = `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_CATALOG='${config.database}'`;
                 const result = await sql.query(query);
                 res.status(200).json({ message: "Success", data: result.recordset });
             } catch (err) {
