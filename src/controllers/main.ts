@@ -1,8 +1,10 @@
+import { config } from '../config';
+const sql = require("mssql/msnodesqlv8");
+
 /**
  * @description a dummy class to showcase how controllers should structured
  * @class Main
  */
-
 class MainController {
     /**
      * @author Whomever
@@ -14,16 +16,6 @@ class MainController {
         res.status(200).json({ message: "Hey! You made it." });
     }
     static getTables(req: any, res: any) {
-        const sql = require("mssql/msnodesqlv8");
-        const config  = {
-            server: "localhost",
-            port: 1433,
-            database: "test",
-            driver: "msnodesqlv8",
-            options: {
-                trustedConnection: true,
-            }
-        };
         (async function () {
             try {
                 await sql.connect(config)
@@ -35,17 +27,8 @@ class MainController {
             }
         })()
     }
+    
     static getContent(req: any, res: any) {
-        const sql = require("mssql/msnodesqlv8");
-        const config  = {
-            server: "localhost",
-            port: 1433,
-            database: "test",
-            driver: "msnodesqlv8",
-            options: {
-                trustedConnection: true,
-            }
-        };
         (async function () {
             try {
                 await sql.connect(config)
@@ -59,16 +42,6 @@ class MainController {
     }
 
     static createRow(req: any, res: any) {
-        const sql = require("mssql/msnodesqlv8");
-        const config  = {
-            server: "localhost",
-            port: 1433,
-            database: "test",
-            driver: "msnodesqlv8",
-            options: {
-                trustedConnection: true,
-            }
-        };
         (async function () {
             try {
                 await sql.connect(config)
@@ -104,16 +77,6 @@ class MainController {
     }
 
     static updateRow(req: any, res: any) {
-        const sql = require("mssql/msnodesqlv8");
-        const config  = {
-            server: "localhost",
-            port: 1433,
-            database: "test",
-            driver: "msnodesqlv8",
-            options: {
-                trustedConnection: true,
-            }
-        };
         (async function () {
             try {
                 await sql.connect(config)
@@ -138,16 +101,6 @@ class MainController {
     }
 
     static deleteRow(req: any, res: any) {
-        const sql = require("mssql/msnodesqlv8");
-        const config  = {
-            server: "localhost",
-            port: 1433,
-            database: "test",
-            driver: "msnodesqlv8",
-            options: {
-                trustedConnection: true,
-            }
-        };
         (async function () {
             try {
                 await sql.connect(config)
