@@ -1,5 +1,7 @@
-import { config } from '../config';
+import { config } from "../config";
 const sql = require("mssql/msnodesqlv8");
+const bcrypt = require("bcrypt");
+const saltRound = 10;
 
 /**
  * @description a dummy class to showcase how controllers should structured
@@ -12,27 +14,75 @@ class MainController {
      * @param {object} res
      * @returns {Object} Returns an object
      */
-    static home(req: any, res: any) {
-        res.status(200).json({ message: "Hey! You made it." });
+
+    static login(req: any, res: any) {
+        (async function () {
+            try {
+                await sql.connect(config)
+                const query = `SELECT * FROM users WHERE fullname='${req.body.username}'`;
+                const user = await sql.query(query);
+                if (user.recordset.length) {
+                    const hash = user.recordset[0].password;
+                    bcrypt.compare(req.body.password, hash, function (err: any, match: any) {
+                        if (match) {
+                            res.status(200).json({ message: "Log In Success", description: "You was logined successfully." });
+                        }
+                        else {
+                            res.status(200).json({ message: "Log In Error", description: "Your passowrd is incorrect." });
+                        }
+                    });
+                } else {
+                    res.status(200).json({ message: "Log In Error", description: 'Not found your name.' });
+                }
+            } catch (err) {
+                console.log(err);
+            }
+        })()
     }
+
+    static signup(req: any, res: any) {
+        (async function () {
+            try {
+                await sql.connect(config)
+                const query = `SELECT * FROM users WHERE fullname='${req.body.fullname}' OR email='${req.body.email}'`;
+                const user = await sql.query(query);
+                if (user.recordset.length) {
+                    res.status(200).json({ message: "Sign Up Error", description: "Same name or email is exist already.", data: null });
+                } else {
+                    let password: any;
+                    bcrypt.genSalt(saltRound, (err: any, salt: any) => {
+                        bcrypt.hash(req.body.createpassword, salt, (err: any, hash: any) => {
+                            password = hash;
+                            const query = `INSERT INTO users (fullname, email, password) VALUES ('${req.body.fullname}', '${req.body.email}', '${password}')`;
+                            sql.query(query);
+                            res.status(200).json({ message: "Sign Up Success", description: "Your info was registered successfully." });
+                        });
+                    });
+                }
+            } catch (err) {
+                console.log(err);
+            }
+        })()
+    }
+
     static getTables(req: any, res: any) {
         (async function () {
             try {
                 await sql.connect(config)
                 const query = `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_CATALOG='${config.database}'`;
                 const result = await sql.query(query);
-                res.status(200).json({ message: "Success", data: result.recordset });
+                res.status(200).json({ message: "Success", data: result.recordset.filter((item: any) => (item.TABLE_NAME != 'users' && item.TABLE_NAME != 'log')) });
             } catch (err) {
                 console.log(err);
             }
         })()
     }
-    
+
     static getContent(req: any, res: any) {
         (async function () {
             try {
                 await sql.connect(config)
-                const query = `select * from ${req.body.table} order by Id desc`;
+                const query = `SELECT * FROM ${req.body.table} ORDER BY Id DESC`;
                 const result = await sql.query(query);
                 res.status(200).json({ message: "Success", data: result.recordset });
             } catch (err) {
@@ -45,7 +95,7 @@ class MainController {
         (async function () {
             try {
                 await sql.connect(config)
-                let query = `insert into ${req.body.table} (`;
+                let query = `INSERT INTO ${req.body.table} (`;
                 let flag1 = 0;
                 for (const key in req.body.data) {
                     if (flag1) {
@@ -56,7 +106,7 @@ class MainController {
                     }
                     query += `${key}`;
                 }
-                query += ') values (';
+                query += ') VALUES (';
                 let flag2 = 0;
                 for (const key in req.body.data) {
                     if (flag2) {
@@ -106,7 +156,7 @@ class MainController {
                 await sql.connect(config)
                 let query = `delete from ${req.body.table} where Id=${req.body.id}`;
                 await sql.query(query);
-                res.status(200).json({ message: "Success" }); 
+                res.status(200).json({ message: "Success" });
             } catch (err) {
                 console.log(err);
             }
@@ -114,4 +164,4 @@ class MainController {
     }
 }
 
-export default MainController; 
+export default MainController;

@@ -3,7 +3,8 @@ import MainController from "../controllers/main";
 
 const router = Router();
 
-router.get("/", MainController.home);
+router.post("/login", MainController.login);
+router.post("/signup", MainController.signup);
 router.get("/getTables", MainController.getTables);
 router.post("/getContent", MainController.getContent);
 router.post("/createRow", MainController.createRow);
