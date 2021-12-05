@@ -10,5 +10,7 @@ router.post("/getContent", MainController.getContent);
 router.post("/createRow", MainController.createRow);
 router.put("/updateRow", MainController.updateRow);
 router.delete("/deleteRow", MainController.deleteRow);
+router.get("/getLogs", MainController.getLogs);
+router.post("/change-password", MainController.changePassword);
 
 export default router;
