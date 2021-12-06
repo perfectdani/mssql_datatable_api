@@ -25,6 +25,55 @@ class MainController {
      * @returns {Object} Returns an object
      */
 
+    static createBaseTables(req: any, res: any) {
+        (async function () {
+            try {
+                await sql.connect(config)
+                const query = `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_CATALOG='${config.database}'`;
+                const result = await sql.query(query);
+                let userFlag = 1;
+                let logFlag = 1;
+                result.recordset.map((item: any) => {
+                    if (item.TABLE_NAME === 'users') userFlag = 0;
+                    if (item.TABLE_NAME === 'logs') logFlag = 0;
+                });
+                if (userFlag) {
+                    const query = 'CREATE TABLE users(\
+                        id INT NOT NULL IDENTITY (1, 1),\
+                        username VARCHAR(50) NOT NULL,\
+                        email VARCHAR(50) NOT NULL,\
+                        password VARCHAR(255) NOT NULL,\
+                        role INT NOT NULL,\
+                        PRIMARY KEY (id)\
+                    )';
+                    await sql.query(query);
+                    bcrypt.genSalt(saltRound, (err: any, salt: any) => {
+                        bcrypt.hash('admin', salt, (err: any, hash: any) => {
+                            const query = `INSERT INTO users (username, email, password, role) VALUES ('admin', 'admin@gmail.com', '${hash}', '1')`;
+                            sql.query(query);
+                        });
+                    });
+                }
+                if (logFlag) {
+                    const query = 'CREATE TABLE logs(\
+                        id INT NOT NULL IDENTITY (1, 1),\
+                        username VARCHAR(50) NOT NULL,\
+                        tablename VARCHAR(50) NOT NULL,\
+                        action VARCHAR(10) NOT NULL,\
+                        oldContent TEXT NOT NULL,\
+                        newContent TEXT NOT NULL,\
+                        logTime TEXT NOT NULL,\
+                        PRIMARY KEY (id)\
+                    )';
+                    await sql.query(query);
+                }
+                res.status(200).json({ message: "success" });
+            } catch (err) {
+                console.log(err);
+            }
+        })()
+    }
+
     static login(req: any, res: any) {
         (async function () {
             try {
@@ -74,13 +123,56 @@ class MainController {
         })()
     }
 
+    static changePassword(req: any, res: any) {
+        (async function () {
+            try {
+                await sql.connect(config)
+                const query = `SELECT * FROM users WHERE username='${req.body.user}'`;
+                const user = await sql.query(query);
+                if (user.recordset.length) {
+                    const hash = user.recordset[0].password;
+                    bcrypt.compare(req.body.oldPassword, hash, function (err: any, match: any) {
+                        if (match) {
+                            bcrypt.genSalt(saltRound, (err: any, salt: any) => {
+                                bcrypt.hash(req.body.newPassword, salt, (err: any, newHash: any) => {
+                                    const changeQuery = `UPDATE users SET password='${newHash}' WHERE username='${req.body.user}'`;
+                                    sql.query(changeQuery);
+                                    res.status(200).json({ message: "Change Success", description: "Your password changed successfully." });
+                                });
+                            });
+                        } else {
+                            res.status(200).json({ message: "Change Error", description: "Please input your old passowrd correctly." });
+                        }
+                    });
+                } else {
+                    res.status(200).json({ message: "Change Error", description: 'Not found your credintial.' });
+                }
+            } catch (err) {
+                console.log(err);
+            }
+        })()
+    }
+
+    static viewLog(req: any, res: any) {
+        (async function () {
+            try {
+                await sql.connect(config)
+                const query = 'SELECT * FROM logs ORDER BY id DESC';
+                const result = await sql.query(query);
+                res.status(200).json({ message: "success", data: result.recordset });
+            } catch (err) {
+                console.log(err);
+            }
+        })()
+    }
+
     static getTables(req: any, res: any) {
         (async function () {
             try {
                 await sql.connect(config)
                 const query = `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_CATALOG='${config.database}'`;
                 const result = await sql.query(query);
-                res.status(200).json({ message: "Success", data: result.recordset.filter((item: any) => (item.TABLE_NAME != 'users' && item.TABLE_NAME != 'logs')) });
+                res.status(200).json({ message: "success", data: result.recordset.filter((item: any) => (item.TABLE_NAME != 'users' && item.TABLE_NAME != 'logs')) });
             } catch (err) {
                 console.log(err);
             }
@@ -91,9 +183,15 @@ class MainController {
         (async function () {
             try {
                 await sql.connect(config)
-                const query = `SELECT * FROM ${req.body.table} ORDER BY Id DESC`;
+                const query = `USE ${config.database} SELECT *  FROM INFORMATION_SCHEMA.COLUMNS  WHERE TABLE_NAME = '${req.body.table}' AND COLUMN_NAME = 'id'`;
                 const result = await sql.query(query);
-                res.status(200).json({ message: "Success", data: result.recordset });
+                if (!result.recordset.length) {
+                    const query = `alter table ${req.body.table} add id int identity(1,1)`;
+                    await sql.query(query);
+                }
+                const contentQuery = `SELECT * FROM ${req.body.table} ORDER BY id DESC`;
+                const contentData = await sql.query(contentQuery);
+                res.status(200).json({ message: "success", data: contentData.recordset });
             } catch (err) {
                 console.log(err);
             }
@@ -117,7 +215,7 @@ class MainController {
                 }
                 query += ') VALUES (';
                 let flag2 = 0;
-                let logContent: any = [];
+                let newContent: any = [];
                 for (const key in req.body.data) {
                     if (flag2) {
                         query += ', ';
@@ -126,14 +224,14 @@ class MainController {
                         flag2 = 1;
                     }
                     query += `'${req.body.data[key]}'`;
-                    logContent = [...logContent, req.body.data[key]];
+                    newContent = [...newContent, req.body.data[key]];
                 }
                 query += `)`;
                 await sql.query(query);
                 const estTime = convertToServerTimeZone();
-                const logQuery = `INSERT INTO logs (username, tablename, action, logContent, updateContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'create', '${JSON.stringify(logContent)}', '', '${estTime}')`;
+                const logQuery = `INSERT INTO logs (username, tablename, action, oldContent, newContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'create', '', '${JSON.stringify(newContent)}', '${estTime}')`;
                 await sql.query(logQuery);
-                res.status(200).json({ message: "Success" });
+                res.status(200).json({ message: "success" });
             } catch (err) {
                 console.log(err);
             }
@@ -144,17 +242,17 @@ class MainController {
         (async function () {
             try {
                 await sql.connect(config)
-                const baseQuery = `SELECT * FROM ${req.body.table} WHERE Id=${req.body.editId}`;
+                const baseQuery = `SELECT * FROM ${req.body.table} WHERE id=${req.body.id}`;
                 const baseData = await sql.query(baseQuery);
-                let logContent: any = [];
+                let oldContent: any = [];
                 for (const key in baseData.recordset[0]) {
-                    if (key !== 'Id') {
-                        logContent = [...logContent, baseData.recordset[0][key]];
+                    if (key !== 'id') {
+                        oldContent = [...oldContent, baseData.recordset[0][key]];
                     }
                 }
                 let query = `UPDATE ${req.body.table} SET`;
                 let flag = 0;
-                let updateContent: any = [];
+                let newContent: any = [];
                 for (const key in req.body.data) {
                     if (flag) {
                         query += ',';
@@ -163,14 +261,14 @@ class MainController {
                         flag = 1;
                     }
                     query += ` ${key}='${req.body.data[key]}'`;
-                    updateContent = [...updateContent, req.body.data[key]];
+                    newContent = [...newContent, req.body.data[key]];
                 }
-                query += ` WHERE Id=${req.body.editId}`;
+                query += ` WHERE id=${req.body.id}`;
                 await sql.query(query);
                 const estTime = convertToServerTimeZone();
-                const logQuery = `INSERT INTO logs (username, tablename, action, logContent, updateContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'update', '${JSON.stringify(logContent)}', '${JSON.stringify(updateContent)}', '${estTime}')`;
+                const logQuery = `INSERT INTO logs (username, tablename, action, oldContent, newContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'update', '${JSON.stringify(oldContent)}', '${JSON.stringify(newContent)}', '${estTime}')`;
                 await sql.query(logQuery);
-                res.status(200).json({ message: "Success" });
+                res.status(200).json({ message: "success" });
             } catch (err) {
                 console.log(err);
             }
@@ -181,62 +279,20 @@ class MainController {
         (async function () {
             try {
                 await sql.connect(config)
-                const baseQuery = `SELECT * FROM ${req.body.table} WHERE Id=${req.body.id}`;
+                const baseQuery = `SELECT * FROM ${req.body.table} WHERE id=${req.body.id}`;
                 const baseData = await sql.query(baseQuery);
-                let logContent: any = [];
+                let oldContent: any = [];
                 for (const key in baseData.recordset[0]) {
-                    if (key !== 'Id') {
-                        logContent = [...logContent, baseData.recordset[0][key]];
+                    if (key !== 'id') {
+                        oldContent = [...oldContent, baseData.recordset[0][key]];
                     }
                 }
-                let query = `DELETE FROM ${req.body.table} WHERE Id=${req.body.id}`;
+                const query = `DELETE FROM ${req.body.table} WHERE id=${req.body.id}`;
                 await sql.query(query);
                 const estTime = convertToServerTimeZone();
-                const logQuery = `INSERT INTO logs (username, tablename, action, logContent, updateContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'delete', '${JSON.stringify(logContent)}', '', '${estTime}')`;
+                const logQuery = `INSERT INTO logs (username, tablename, action, oldContent, newContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'delete', '${JSON.stringify(oldContent)}', '', '${estTime}')`;
                 await sql.query(logQuery);
-                res.status(200).json({ message: "Success" });
-            } catch (err) {
-                console.log(err);
-            }
-        })()
-    }
-
-    static getLogs(req: any, res: any) {
-        (async function () {
-            try {
-                await sql.connect(config)
-                const query = 'SELECT * FROM logs ORDER BY id DESC';
-                const result = await sql.query(query);
-                res.status(200).json({ message: "Success", data: result.recordset });
-            } catch (err) {
-                console.log(err);
-            }
-        })()
-    }
-    static changePassword(req: any, res: any) {
-        (async function () {
-            try {
-                await sql.connect(config)
-                const query = `SELECT * FROM users WHERE username='${req.body.user}'`;
-                const user = await sql.query(query);
-                if (user.recordset.length) {
-                    const hash = user.recordset[0].password;
-                    bcrypt.compare(req.body.oldPassword, hash, function (err: any, match: any) {
-                        if (match) {
-                            bcrypt.genSalt(saltRound, (err: any, salt: any) => {
-                                bcrypt.hash(req.body.newPassword, salt, (err: any, newHash: any) => {
-                                    const changeQuery = `UPDATE users SET password='${newHash}' WHERE username='${req.body.user}'`;
-                                    sql.query(changeQuery);
-                                    res.status(200).json({ message: "Change Success", description: "Your password changed successfully." });
-                                });
-                            });
-                        } else {
-                            res.status(200).json({ message: "Change Password Error", description: "Please input your old passowrd correctly." });
-                        }
-                    });
-                } else {
-                    res.status(200).json({ message: "Change Error", description: 'Not found your credintial.' });
-                }
+                res.status(200).json({ message: "success" });
             } catch (err) {
                 console.log(err);
             }
