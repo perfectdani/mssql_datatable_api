@@ -28,7 +28,7 @@ class MainController {
     static createBaseTables(req: any, res: any) {
         (async function () {
             try {
-                await sql.connect(config)
+                await sql.connect(config);
                 const query = `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_CATALOG='${config.database}'`;
                 const result = await sql.query(query);
                 let userFlag = 1;
@@ -77,7 +77,7 @@ class MainController {
     static login(req: any, res: any) {
         (async function () {
             try {
-                await sql.connect(config)
+                await sql.connect(config);
                 const query = `SELECT * FROM users WHERE username='${req.body.username}'`;
                 const user = await sql.query(query);
                 if (user.recordset.length) {
@@ -103,7 +103,7 @@ class MainController {
     static signup(req: any, res: any) {
         (async function () {
             try {
-                await sql.connect(config)
+                await sql.connect(config);
                 const query = `SELECT * FROM users WHERE username='${req.body.fullname}' OR email='${req.body.email}'`;
                 const user = await sql.query(query);
                 if (user.recordset.length) {
@@ -126,7 +126,7 @@ class MainController {
     static changePassword(req: any, res: any) {
         (async function () {
             try {
-                await sql.connect(config)
+                await sql.connect(config);
                 const query = `SELECT * FROM users WHERE username='${req.body.user}'`;
                 const user = await sql.query(query);
                 if (user.recordset.length) {
@@ -153,10 +153,36 @@ class MainController {
         })()
     }
 
+    static getUsers(req: any, res: any) {
+        (async function () {
+            try {
+                await sql.connect(config);
+                const query = 'SELECT * FROM users ORDER BY id DESC';
+                const result = await sql.query(query);
+                res.status(200).json({ message: "success", data: result.recordset.filter((item: any) => (item.role === 2)) });
+            } catch (err) {
+                console.log(err);
+            }
+        })()
+    }
+
+    static deleteUser(req: any, res: any) {
+        (async function () {
+            try {
+                await sql.connect(config);
+                const query = `DELETE FROM users WHERE id=${req.body.id}`;
+                await sql.query(query);
+                res.status(200).json({ message: "success" });
+            } catch (err) {
+                console.log(err);
+            }
+        })()
+    }
+
     static viewLog(req: any, res: any) {
         (async function () {
             try {
-                await sql.connect(config)
+                await sql.connect(config);
                 const query = 'SELECT * FROM logs ORDER BY id DESC';
                 const result = await sql.query(query);
                 res.status(200).json({ message: "success", data: result.recordset });
@@ -169,7 +195,7 @@ class MainController {
     static getTables(req: any, res: any) {
         (async function () {
             try {
-                await sql.connect(config)
+                await sql.connect(config);
                 const query = `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_CATALOG='${config.database}'`;
                 const result = await sql.query(query);
                 res.status(200).json({ message: "success", data: result.recordset.filter((item: any) => (item.TABLE_NAME != 'users' && item.TABLE_NAME != 'logs')) });
@@ -182,7 +208,7 @@ class MainController {
     static getContent(req: any, res: any) {
         (async function () {
             try {
-                await sql.connect(config)
+                await sql.connect(config);
                 const query = `USE ${config.database} SELECT *  FROM INFORMATION_SCHEMA.COLUMNS  WHERE TABLE_NAME = '${req.body.table}' AND COLUMN_NAME = 'id'`;
                 const result = await sql.query(query);
                 if (!result.recordset.length) {
@@ -201,7 +227,7 @@ class MainController {
     static createRow(req: any, res: any) {
         (async function () {
             try {
-                await sql.connect(config)
+                await sql.connect(config);
                 let query = `INSERT INTO ${req.body.table} (`;
                 let flag1 = 0;
                 for (const key in req.body.data) {
@@ -241,7 +267,7 @@ class MainController {
     static updateRow(req: any, res: any) {
         (async function () {
             try {
-                await sql.connect(config)
+                await sql.connect(config);
                 const baseQuery = `SELECT * FROM ${req.body.table} WHERE id=${req.body.id}`;
                 const baseData = await sql.query(baseQuery);
                 let oldContent: any = [];
@@ -278,7 +304,7 @@ class MainController {
     static deleteRow(req: any, res: any) {
         (async function () {
             try {
-                await sql.connect(config)
+                await sql.connect(config);
                 const baseQuery = `SELECT * FROM ${req.body.table} WHERE id=${req.body.id}`;
                 const baseData = await sql.query(baseQuery);
                 let oldContent: any = [];
