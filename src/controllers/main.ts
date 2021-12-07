@@ -88,11 +88,11 @@ class MainController {
                             res.status(200).json({ message: "Log In Success", description: "You are logged in successfully.", admin });
                         }
                         else {
-                            res.status(200).json({ message: "Log In Error", description: "Your passowrd is incorrect." });
+                            res.status(200).json({ message: "Log In Error", description: 'Username or password is incrrect.' });
                         }
                     });
                 } else {
-                    res.status(200).json({ message: "Log In Error", description: 'Not found your name.' });
+                    res.status(200).json({ message: "Log In Error", description: 'Username or password is incrrect.' });
                 }
             } catch (err) {
                 console.log(err);
@@ -113,7 +113,7 @@ class MainController {
                         bcrypt.hash(req.body.createpassword, salt, (err: any, hash: any) => {
                             const query = `INSERT INTO users (username, email, password, role) VALUES ('${req.body.fullname}', '${req.body.email}', '${hash}', 2)`;
                             sql.query(query);
-                            res.status(200).json({ message: "Sign Up Success", description: "Your credential is registered successfully." });
+                            res.status(200).json({ message: "Sign Up Success", description: "Your credential has been registered successfully." });
                         });
                     });
                 }
@@ -137,15 +137,15 @@ class MainController {
                                 bcrypt.hash(req.body.newPassword, salt, (err: any, newHash: any) => {
                                     const changeQuery = `UPDATE users SET password='${newHash}' WHERE username='${req.body.user}'`;
                                     sql.query(changeQuery);
-                                    res.status(200).json({ message: "Change Success", description: "Your password changed successfully." });
+                                    res.status(200).json({ message: "Change Success", description: "Your password has been changed successfully." });
                                 });
                             });
                         } else {
-                            res.status(200).json({ message: "Change Error", description: "Please input your old passowrd correctly." });
+                            res.status(200).json({ message: "Change Error", description: "Old password is incorrect." });
                         }
                     });
                 } else {
-                    res.status(200).json({ message: "Change Error", description: 'Not found your credintial.' });
+                    res.status(200).json({ message: "Change Error", description: 'Your credintial is not exist.' });
                 }
             } catch (err) {
                 console.log(err);
