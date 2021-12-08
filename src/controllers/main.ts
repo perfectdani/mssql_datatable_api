@@ -224,6 +224,37 @@ class MainController {
         })()
     }
 
+    static replace(req: any, res: any) {
+        (async function () {
+            try {
+                await sql.connect(config);
+                const query = `USE ${config.database} SELECT *  FROM INFORMATION_SCHEMA.COLUMNS  WHERE TABLE_NAME = '${req.body.table}' AND COLUMN_NAME != 'id'`;
+                const result = await sql.query(query);
+                for (const item of result.recordset) {
+                    try {
+                        let replaceQuery = `UPDATE ${req.body.table} SET ${item.COLUMN_NAME} = REPLACE(${item.COLUMN_NAME}`;
+                        if (item.DATA_TYPE !="float" && req.body.matchCase) replaceQuery += ' COLLATE Latin1_General_CS_AS';
+                        replaceQuery += `, '${req.body.findWord}', '${req.body.replaceWord}')`;
+                        if (req.body.matchEntire) replaceQuery += `WHERE ${item.COLUMN_NAME}`;
+                        if (item.DATA_TYPE !="float" && req.body.matchCase && req.body.matchEntire) replaceQuery += ' COLLATE Latin1_General_CS_AS';
+                        if (req.body.matchEntire) replaceQuery += ` = '${req.body.findWord}'`;
+                        await sql.query(replaceQuery);
+                    } catch {
+                        continue
+                    }
+                }
+                const estTime = convertToServerTimeZone();
+                const logQuery = `INSERT INTO logs (username, tablename, action, oldContent, newContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'replace', '${req.body.findWord}', '${req.body.replaceWord}', '${estTime}')`;
+                await sql.query(logQuery);
+                const contentQuery = `SELECT * FROM ${req.body.table} ORDER BY id DESC`;
+                const contentData = await sql.query(contentQuery);
+                res.status(200).json({ message: "success", data: contentData.recordset });
+            } catch (err) {
+                console.log(err);
+            }
+        })()
+    }
+
     static createRow(req: any, res: any) {
         (async function () {
             try {
