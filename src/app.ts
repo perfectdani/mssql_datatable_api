@@ -4,7 +4,9 @@ import routes from "./routes";
 const app = express();
 const API_PREFIX = "/api";
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+  limit: '50mb'
+}));
 app.get(
   "/api",
   (req: Request, res: Response): Response => {

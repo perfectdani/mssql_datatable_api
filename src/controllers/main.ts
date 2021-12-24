@@ -2,15 +2,15 @@ import { config } from "../config";
 const sql = require("mssql/msnodesqlv8");
 const bcrypt = require("bcrypt");
 const saltRound = 10;
-const offset = -5.0
+// const offset = -5.0
 
-function convertToServerTimeZone() {
-    //EST
-    const clientDate = new Date();
-    const utc = clientDate.getTime() + (clientDate.getTimezoneOffset() * 60000);
-    const serverDate = new Date(utc + (3600000 * offset));
-    return serverDate.toLocaleString();
-}
+// function convertToServerTimeZone() {
+//     //EST
+//     const clientDate = new Date();
+//     const utc = clientDate.getTime() + (clientDate.getTimezoneOffset() * 60000);
+//     const serverDate = new Date(utc + (3600000 * offset));
+//     return serverDate.toLocaleString();
+// }
 
 /**
  * @description a dummy class to showcase how controllers should structured
@@ -32,10 +32,10 @@ class MainController {
                 const query = `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_CATALOG='${config.database}'`;
                 const result = await sql.query(query);
                 let userFlag = 1;
-                let logFlag = 1;
+                // let logFlag = 1;
                 result.recordset.map((item: any) => {
                     if (item.TABLE_NAME === 'users') userFlag = 0;
-                    if (item.TABLE_NAME === 'logs') logFlag = 0;
+                    // if (item.TABLE_NAME === 'logs') logFlag = 0;
                 });
                 if (userFlag) {
                     const query = 'CREATE TABLE users(\
@@ -54,19 +54,19 @@ class MainController {
                         });
                     });
                 }
-                if (logFlag) {
-                    const query = 'CREATE TABLE logs(\
-                        id INT NOT NULL IDENTITY (1, 1),\
-                        username VARCHAR(50) NOT NULL,\
-                        tablename VARCHAR(50) NOT NULL,\
-                        action VARCHAR(10) NOT NULL,\
-                        oldContent TEXT NOT NULL,\
-                        newContent TEXT NOT NULL,\
-                        logTime TEXT NOT NULL,\
-                        PRIMARY KEY (id)\
-                    )';
-                    await sql.query(query);
-                }
+                // if (logFlag) {
+                //     const query = 'CREATE TABLE logs(\
+                //         id INT NOT NULL IDENTITY (1, 1),\
+                //         username VARCHAR(50) NOT NULL,\
+                //         tablename VARCHAR(50) NOT NULL,\
+                //         action VARCHAR(10) NOT NULL,\
+                //         oldContent TEXT NOT NULL,\
+                //         newContent TEXT NOT NULL,\
+                //         logTime TEXT NOT NULL,\
+                //         PRIMARY KEY (id)\
+                //     )';
+                //     await sql.query(query);
+                // }
                 res.status(200).json({ message: "success" });
             } catch (err) {
                 console.log(err);
@@ -179,18 +179,18 @@ class MainController {
         })()
     }
 
-    static viewLog(req: any, res: any) {
-        (async function () {
-            try {
-                await sql.connect(config);
-                const query = 'SELECT * FROM logs ORDER BY id DESC';
-                const result = await sql.query(query);
-                res.status(200).json({ message: "success", data: result.recordset });
-            } catch (err) {
-                console.log(err);
-            }
-        })()
-    }
+    // static viewLog(req: any, res: any) {
+    //     (async function () {
+    //         try {
+    //             await sql.connect(config);
+    //             const query = 'SELECT * FROM logs ORDER BY id DESC';
+    //             const result = await sql.query(query);
+    //             res.status(200).json({ message: "success", data: result.recordset });
+    //         } catch (err) {
+    //             console.log(err);
+    //         }
+    //     })()
+    // }
 
     static getTables(req: any, res: any) {
         (async function () {
@@ -215,140 +215,211 @@ class MainController {
                     const query = `alter table ${req.body.table} add id int identity(1,1)`;
                     await sql.query(query);
                 }
-                const contentQuery = `SELECT * FROM ${req.body.table} ORDER BY id DESC`;
-                const contentData = await sql.query(contentQuery);
-                res.status(200).json({ message: "success", data: contentData.recordset });
-            } catch (err) {
-                console.log(err);
-            }
-        })()
-    }
-
-    static replace(req: any, res: any) {
-        (async function () {
-            try {
-                await sql.connect(config);
-                const query = `USE ${config.database} SELECT *  FROM INFORMATION_SCHEMA.COLUMNS  WHERE TABLE_NAME = '${req.body.table}' AND COLUMN_NAME != 'id'`;
-                const result = await sql.query(query);
-                for (const item of result.recordset) {
-                    try {
-                        let replaceQuery = `UPDATE ${req.body.table} SET ${item.COLUMN_NAME} = REPLACE(${item.COLUMN_NAME}`;
-                        if (item.DATA_TYPE !="float" && req.body.matchCase) replaceQuery += ' COLLATE Latin1_General_CS_AS';
-                        replaceQuery += `, '${req.body.findWord}', '${req.body.replaceWord}')`;
-                        if (req.body.matchEntire) replaceQuery += `WHERE ${item.COLUMN_NAME}`;
-                        if (item.DATA_TYPE !="float" && req.body.matchCase && req.body.matchEntire) replaceQuery += ' COLLATE Latin1_General_CS_AS';
-                        if (req.body.matchEntire) replaceQuery += ` = '${req.body.findWord}'`;
-                        await sql.query(replaceQuery);
-                    } catch {
-                        continue
-                    }
-                }
-                const estTime = convertToServerTimeZone();
-                const logQuery = `INSERT INTO logs (username, tablename, action, oldContent, newContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'replace', '${req.body.findWord}', '${req.body.replaceWord}', '${estTime}')`;
-                await sql.query(logQuery);
-                const contentQuery = `SELECT * FROM ${req.body.table} ORDER BY id DESC`;
-                const contentData = await sql.query(contentQuery);
-                res.status(200).json({ message: "success", data: contentData.recordset });
-            } catch (err) {
-                console.log(err);
-            }
-        })()
-    }
-
-    static createRow(req: any, res: any) {
-        (async function () {
-            try {
-                await sql.connect(config);
-                let query = `INSERT INTO ${req.body.table} (`;
-                let flag1 = 0;
-                for (const key in req.body.data) {
-                    if (flag1) {
-                        query += ', ';
-                    }
-                    else {
-                        flag1 = 1;
-                    }
-                    query += `${key}`;
-                }
-                query += ') VALUES (';
-                let flag2 = 0;
-                let newContent: any = [];
-                for (const key in req.body.data) {
-                    if (flag2) {
-                        query += ', ';
-                    }
-                    else {
-                        flag2 = 1;
-                    }
-                    query += `'${req.body.data[key]}'`;
-                    newContent = [...newContent, req.body.data[key]];
-                }
-                query += `)`;
-                await sql.query(query);
-                const estTime = convertToServerTimeZone();
-                const logQuery = `INSERT INTO logs (username, tablename, action, oldContent, newContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'create', '', '${JSON.stringify(newContent)}', '${estTime}')`;
-                await sql.query(logQuery);
-                res.status(200).json({ message: "success" });
-            } catch (err) {
-                console.log(err);
-            }
-        })()
-    }
-
-    static updateRow(req: any, res: any) {
-        (async function () {
-            try {
-                await sql.connect(config);
-                const baseQuery = `SELECT * FROM ${req.body.table} WHERE id=${req.body.id}`;
-                const baseData = await sql.query(baseQuery);
-                let oldContent: any = [];
-                for (const key in baseData.recordset[0]) {
-                    if (key !== 'id') {
-                        oldContent = [...oldContent, baseData.recordset[0][key]];
-                    }
-                }
-                let query = `UPDATE ${req.body.table} SET`;
+                const check = `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '${req.body.table}'`;
+                const ress = await sql.query(check);
+                let head: any = [];
+                let hh: any = {};
+                let contentQuery = 'SELECT ';
                 let flag = 0;
-                let newContent: any = [];
-                for (const key in req.body.data) {
-                    if (flag) {
-                        query += ',';
+                for (const column of ress.recordset) {
+                    if (column['COLUMN_NAME'] !=='id') {
+                        if (flag) {
+                            contentQuery += ', ';
+                        } else {
+                            flag = 1;
+                        }
+                        contentQuery += `${column['COLUMN_NAME']}`;
+                        hh[column['COLUMN_NAME']] = '';
                     }
-                    else {
-                        flag = 1;
-                    }
-                    query += ` ${key}='${req.body.data[key]}'`;
-                    newContent = [...newContent, req.body.data[key]];
                 }
-                query += ` WHERE id=${req.body.id}`;
-                await sql.query(query);
-                const estTime = convertToServerTimeZone();
-                const logQuery = `INSERT INTO logs (username, tablename, action, oldContent, newContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'update', '${JSON.stringify(oldContent)}', '${JSON.stringify(newContent)}', '${estTime}')`;
-                await sql.query(logQuery);
-                res.status(200).json({ message: "success" });
+                head = [...head, hh];
+                contentQuery += ` FROM ${req.body.table} ORDER BY id`;
+                const contentData = await sql.query(contentQuery);
+                if (!contentData.recordset.length) {
+                    res.status(200).json({ message: "success", data: head });
+                } else {
+                    res.status(200).json({ message: "success", data: contentData.recordset });
+                }
             } catch (err) {
                 console.log(err);
             }
         })()
     }
 
-    static deleteRow(req: any, res: any) {
+    // static replace(req: any, res: any) {
+    //     (async function () {
+    //         try {
+    //             await sql.connect(config);
+    //             const query = `USE ${config.database} SELECT *  FROM INFORMATION_SCHEMA.COLUMNS  WHERE TABLE_NAME = '${req.body.table}' AND COLUMN_NAME != 'id'`;
+    //             const result = await sql.query(query);
+    //             for (const item of result.recordset) {
+    //                 try {
+    //                     let replaceQuery = `UPDATE ${req.body.table} SET ${item.COLUMN_NAME} = REPLACE(${item.COLUMN_NAME}`;
+    //                     if (item.DATA_TYPE !="float" && req.body.matchCase) replaceQuery += ' COLLATE Latin1_General_CS_AS';
+    //                     replaceQuery += `, '${req.body.findWord}', '${req.body.replaceWord}')`;
+    //                     if (req.body.matchEntire) replaceQuery += `WHERE ${item.COLUMN_NAME}`;
+    //                     if (item.DATA_TYPE !="float" && req.body.matchCase && req.body.matchEntire) replaceQuery += ' COLLATE Latin1_General_CS_AS';
+    //                     if (req.body.matchEntire) replaceQuery += ` = '${req.body.findWord}'`;
+    //                     await sql.query(replaceQuery);
+    //                 } catch {
+    //                     continue
+    //                 }
+    //             }
+    //             const estTime = convertToServerTimeZone();
+    //             const logQuery = `INSERT INTO logs (username, tablename, action, oldContent, newContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'replace', '${req.body.findWord}', '${req.body.replaceWord}', '${estTime}')`;
+    //             await sql.query(logQuery);
+    //             const contentQuery = `SELECT * FROM ${req.body.table} ORDER BY id DESC`;
+    //             const contentData = await sql.query(contentQuery);
+    //             res.status(200).json({ message: "success", data: contentData.recordset });
+    //         } catch (err) {
+    //             console.log(err);
+    //         }
+    //     })()
+    // }
+
+    // static createRow(req: any, res: any) {
+    //     (async function () {
+    //         try {
+    //             await sql.connect(config);
+    //             let query = `INSERT INTO ${req.body.table} (`;
+    //             let flag1 = 0;
+    //             for (const key in req.body.data) {
+    //                 if (flag1) {
+    //                     query += ', ';
+    //                 }
+    //                 else {
+    //                     flag1 = 1;
+    //                 }
+    //                 query += `${key}`;
+    //             }
+    //             query += ') VALUES (';
+    //             let flag2 = 0;
+    //             let newContent: any = [];
+    //             for (const key in req.body.data) {
+    //                 if (flag2) {
+    //                     query += ', ';
+    //                 }
+    //                 else {
+    //                     flag2 = 1;
+    //                 }
+    //                 query += `'${req.body.data[key]}'`;
+    //                 newContent = [...newContent, req.body.data[key]];
+    //             }
+    //             query += `)`;
+    //             await sql.query(query);
+    //             const estTime = convertToServerTimeZone();
+    //             const logQuery = `INSERT INTO logs (username, tablename, action, oldContent, newContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'create', '', '${JSON.stringify(newContent)}', '${estTime}')`;
+    //             await sql.query(logQuery);
+    //             res.status(200).json({ message: "success" });
+    //         } catch (err) {
+    //             console.log(err);
+    //         }
+    //     })()
+    // }
+
+    // static updateRow(req: any, res: any) {
+    //     (async function () {
+    //         try {
+    //             await sql.connect(config);
+    //             const baseQuery = `SELECT * FROM ${req.body.table} WHERE id=${req.body.id}`;
+    //             const baseData = await sql.query(baseQuery);
+    //             let oldContent: any = [];
+    //             for (const key in baseData.recordset[0]) {
+    //                 if (key !== 'id') {
+    //                     oldContent = [...oldContent, baseData.recordset[0][key]];
+    //                 }
+    //             }
+    //             let query = `UPDATE ${req.body.table} SET`;
+    //             let flag = 0;
+    //             let newContent: any = [];
+    //             for (const key in req.body.data) {
+    //                 if (flag) {
+    //                     query += ',';
+    //                 }
+    //                 else {
+    //                     flag = 1;
+    //                 }
+    //                 query += ` ${key}='${req.body.data[key]}'`;
+    //                 newContent = [...newContent, req.body.data[key]];
+    //             }
+    //             query += ` WHERE id=${req.body.id}`;
+    //             await sql.query(query);
+    //             const estTime = convertToServerTimeZone();
+    //             const logQuery = `INSERT INTO logs (username, tablename, action, oldContent, newContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'update', '${JSON.stringify(oldContent)}', '${JSON.stringify(newContent)}', '${estTime}')`;
+    //             await sql.query(logQuery);
+    //             res.status(200).json({ message: "success" });
+    //         } catch (err) {
+    //             console.log(err);
+    //         }
+    //     })()
+    // }
+
+    // static deleteRow(req: any, res: any) {
+    //     (async function () {
+    //         try {
+    //             await sql.connect(config);
+    //             const baseQuery = `SELECT * FROM ${req.body.table} WHERE id=${req.body.id}`;
+    //             const baseData = await sql.query(baseQuery);
+    //             let oldContent: any = [];
+    //             for (const key in baseData.recordset[0]) {
+    //                 if (key !== 'id') {
+    //                     oldContent = [...oldContent, baseData.recordset[0][key]];
+    //                 }
+    //             }
+    //             const query = `DELETE FROM ${req.body.table} WHERE id=${req.body.id}`;
+    //             await sql.query(query);
+    //             const estTime = convertToServerTimeZone();
+    //             const logQuery = `INSERT INTO logs (username, tablename, action, oldContent, newContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'delete', '${JSON.stringify(oldContent)}', '', '${estTime}')`;
+    //             await sql.query(logQuery);
+    //             res.status(200).json({ message: "success" });
+    //         } catch (err) {
+    //             console.log(err);
+    //         }
+    //     })()
+    // }
+
+    // static saveData(req: any, res: any) {
+    //     (async function ( {
+    //         try {
+    //             await sql.connect(config);
+    //             const query = `DELETE FROM ${req.table}`;
+    //             for (const key in baseData.r)
+    //         }
+    //     }))
+    // }
+
+    static saveContent(req: any, res: any) {
         (async function () {
             try {
                 await sql.connect(config);
-                const baseQuery = `SELECT * FROM ${req.body.table} WHERE id=${req.body.id}`;
-                const baseData = await sql.query(baseQuery);
-                let oldContent: any = [];
-                for (const key in baseData.recordset[0]) {
-                    if (key !== 'id') {
-                        oldContent = [...oldContent, baseData.recordset[0][key]];
+                let deleteQuery = `DELETE FROM ${req.body.table}`;
+                await sql.query(deleteQuery);
+                let columnQuery = `INSERT INTO ${req.body.table} (`;
+                req.body.data[0].map((column: any, index: any) => {
+                    if (index) {
+                        columnQuery += ', ';
                     }
-                }
-                const query = `DELETE FROM ${req.body.table} WHERE id=${req.body.id}`;
-                await sql.query(query);
-                const estTime = convertToServerTimeZone();
-                const logQuery = `INSERT INTO logs (username, tablename, action, oldContent, newContent, logTime) VALUES ('${req.body.user}', '${req.body.table}', 'delete', '${JSON.stringify(oldContent)}', '', '${estTime}')`;
-                await sql.query(logQuery);
+                    columnQuery += `${column}`;
+                });
+                columnQuery += ') VALUES (';
+                req.body.data.map(async (row: any, index: any) => {
+                    if (index) {
+                        let dataQuery = '';
+                        row.map((cell: any, index: any) => {
+                            if (index) {
+                                dataQuery += ', ';
+                            }
+                            if (cell) {
+                                dataQuery += `'${cell}'`;
+                            } else {
+                                dataQuery += 'null';
+                            }
+                        });
+                        dataQuery += ')';
+                        let query = columnQuery + dataQuery;
+                        await sql.query(query);
+                    }
+                });
                 res.status(200).json({ message: "success" });
             } catch (err) {
                 console.log(err);
